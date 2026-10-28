@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "checks": [
+    "HTTP production entry",
+    "HTTP streamed gzip asset loading",
+    "population metadata",
+    "left-side tracking telemetry",
+    "pause stops worker loop",
+    "reset restores simulation clock",
+    "resume and looming escape",
+    "noise control accepted"
+  ],
+  "neurons": 166700,
+  "synapses": 25088107,
+  "populations": {
+    "seeL": 135,
+    "seeR": 140,
+    "loomL": 165,
+    "loomR": 146,
+    "left": 3,
+    "right": 3,
+    "escape": 2,
+    "wing": 58,
+    "antennaL": 194,
+    "antennaR": 130,
+    "windLeft": 4,
+    "windRight": 4
+  },
+  "tracking": {
+    "left": 8.112008952100522,
+    "right": 0.6483741468979067,
+    "escape": 0,
+    "wing": 0.49335328764974257,
+    "sensory": 21.56079964154391,
+    "windLeft": 0.0015176959136640146,
+    "windRight": 0.42081501319304526,
+    "fired": 8013,
+    "stepMs": 4.583245194897004,
+    "simTime": 1.52,
+    "dt": 0.02
+  },
+  "escape": {
+    "left": 0.30032806013859636,
+    "right": 0.8064949934129665,
+    "escape": 46.24631736637687,
+    "wing": 0.9367965792834438,
+    "sensory": 0.015662307893682885,
+    "windLeft": 0,
+    "windRight": 0.19877893712366348,
+    "fired": 6745,
+    "stepMs": 3.9328812677090723,
+    "simTime": 0.6,
+    "dt": 0.02
+  }
+}
