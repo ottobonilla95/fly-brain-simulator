@@ -15,16 +15,23 @@ The browser export contains 166,700 neurons and 25,088,107 connections. It uses 
 
 ## Neural dynamics
 
-Each neuron uses upstream leaky integrate-and-fire dynamics. Per step, its voltage decays, receives weighted input from the previous step's spikes, tonic drive, random background input, and our injected sensory drive. At threshold 1 it fires and resets. The time step is taken from the asset metadata (20 ms). The complete network is stepped in a dedicated worker, once per 20 ms wall-clock budget or slower when necessary. The UI reports measured step execution time and simulation time separately.
+Each neuron uses upstream leaky integrate-and-fire dynamics. Per step, its voltage decays, receives weighted input from the previous step's spikes, tonic drive, random background input, and our injected sensory drive. At threshold 1 it fires and resets. The time step is taken from the asset metadata (20 ms). The complete network is stepped in a dedicated worker with a fixed 20 ms neural step. Playback speed changes how many fixed steps run per wall-clock second. The worker updates body position and sensory encodings every neural step, so world movement, contact and stimulus timing use the same simulation clock. Work is batched with short yields; requested speed can exceed available CPU throughput. The UI reports achieved speed separately.
 
 We do not train the network or a readout. Input strengths and sound mappings are manually chosen. The noise slider multiplies the exported model's noise amplitude, retaining its other parameters. Reset uses seed 64; identical sensory histories and noise settings on the same engine are reproducible. Live interaction is not saved as a complete replay.
 
 ## Sensory adapters
 
-- **Target:** The scene computes bearing relative to specimen heading. Bearings within ±153° drive LC10a; left/right stimulation is split linearly within ±0.35 radians. Input is the intensity slider times that side's fraction. This broad field of view is an interface choice, not a calibrated eye model.
-- **Loom:** A user-triggered 450 ms pulse drives bilateral LC4/LPLC2 at the selected intensity. Expanding the visual marker illustrates the pulse. This is an explicit stimulus button, not automatic image-based looming detection.
-- **Wind:** Marker bearing determines stimulation of the Johnston's-organ neuron types used in the upstream drone example. Both bearing and intensity are calculated values, not a physical fluid simulation.
-- **Isolation:** Disables all external stimulation. Intrinsic dynamics and background noise continue.
+Several placed sources may be active at once. Each has a position, strength, on/off switch and independent visibility flag. Contributions sum per channel and are capped at 1. These are authored numerical encoders, not physical models of light, acoustics or fluid flow.
+
+- **Vision:** Visible objects drive LC10a on the side of their bearing within ±153°. The side split interpolates within ±0.35 radians. Strength attenuates with horizontal distance as `strength / (1 + (distance / 2.5)^2)`.
+- **Loom:** A selected threat emits a user-triggered 450 ms pulse of bilateral LC4/LPLC2 stimulation when in view. Pulse duration uses simulation time. This is an explicit pulse, not automatic image-based looming detection.
+- **Wind:** Source direction splits stimulation of the upstream drone example’s wind-sensitive Johnston’s-organ neurons. Wind uses the same distance falloff.
+- **Sound:** Source direction and distance drive JO-A/JO-B hearing populations. A speaker is a neural stimulus source; the existing instrument soundtrack is a separate audio output.
+- **Smell:** Food sources stimulate ORN_DM1/ORN_DM2, with directional split and distance falloff, including behind the fly. The supplied export already has `sensory_input: false`, avoiding the upstream sensory-neuron feedback problem.
+- **Touch / taste:** Contact within 0.6 horizontal world units drives BM_InOm or claw_tpGRN/dorsal_tpGRN/BM_Taste respectively. This is proximity-based contact, not a physics collision solver.
+- **Isolation:** Disables every external stimulation channel. Intrinsic dynamics and background noise continue.
+
+Hearing, smell and contact readouts measure actual sensory-population firing rates. No new approach-to-food or turn-toward-sound rule is scripted; those inputs may change network activity without producing obvious locomotion through the existing motor decoder.
 
 The visual front end bypasses the photoreceptors and lamina. In the upstream simplified model, that early visual route does not successfully relay the signal. The network receives numeric drive, never a rendered image or an image embedding.
 

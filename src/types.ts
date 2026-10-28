@@ -1,10 +1,32 @@
 export type StimulusMode = "target" | "loom" | "wind";
+export type SourceKind = StimulusMode | "sound" | "smell" | "touch" | "taste";
+export interface WorldSource {
+  id: string;
+  kind: SourceKind;
+  x: number;
+  z: number;
+  strength: number;
+  visible: boolean;
+  enabled: boolean;
+  pulseAt: number;
+}
+export interface WorldPose {
+  x: number;
+  z: number;
+  heading: number;
+}
 export interface SensoryInput {
   left: number;
   right: number;
   looming: number;
   windLeft: number;
   windRight: number;
+  soundLeft?: number;
+  soundRight?: number;
+  smellLeft?: number;
+  smellRight?: number;
+  touch?: number;
+  taste?: number;
   enabled: boolean;
 }
 export interface NeuralState {
@@ -19,6 +41,9 @@ export interface NeuralState {
   stepMs: number;
   simTime: number;
   dt: number;
+  hearing: number;
+  smell: number;
+  contact: number;
 }
 export const EMPTY_NEURAL: NeuralState = {
   left: 0,
@@ -32,19 +57,21 @@ export const EMPTY_NEURAL: NeuralState = {
   stepMs: 0,
   simTime: 0,
   dt: 0.02,
+  hearing: 0,
+  smell: 0,
+  contact: 0,
 };
 export interface WorldState {
   x: number;
   z: number;
   heading: number;
-  targetX: number;
-  targetZ: number;
   running: boolean;
   trails: boolean;
   grid: boolean;
-  mode: StimulusMode;
-  intensity: number;
-  pulse: number;
+  sources: WorldSource[];
+  selectedId: string | null;
+  placing: SourceKind | null;
+  simTime: number;
   reset: number;
   overhead: boolean;
   isolated: boolean;

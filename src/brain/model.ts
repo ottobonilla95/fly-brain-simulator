@@ -72,6 +72,20 @@ export class InstrumentBrain {
       wing: cells(meta, WINGS),
       antennaL: cells(meta, ANTENNA, "L"),
       antennaR: cells(meta, ANTENNA, "R"),
+      earL: cells(
+        meta,
+        meta.types.filter((t) => t.startsWith("JO-A") || t.startsWith("JO-B")),
+        "L",
+      ),
+      earR: cells(
+        meta,
+        meta.types.filter((t) => t.startsWith("JO-A") || t.startsWith("JO-B")),
+        "R",
+      ),
+      smellL: cells(meta, ["ORN_DM1", "ORN_DM2"], "L"),
+      smellR: cells(meta, ["ORN_DM1", "ORN_DM2"], "R"),
+      touch: cells(meta, ["BM_InOm"]),
+      taste: cells(meta, ["claw_tpGRN", "dorsal_tpGRN", "BM_Taste"]),
       windLeft: cells(meta, WIND, "L"),
       windRight: cells(meta, WIND, "R"),
     };
@@ -86,6 +100,12 @@ export class InstrumentBrain {
       "antennaR",
       "windLeft",
       "windRight",
+      "earL",
+      "earR",
+      "smellL",
+      "smellR",
+      "touch",
+      "taste",
     ]) {
       if (!this.groups[key].length)
         throw new Error(`Missing connectome population: ${key}`);
@@ -106,6 +126,12 @@ export class InstrumentBrain {
       b.stimulate(g.loomR, input.looming);
       b.stimulate(g.antennaL, input.windLeft);
       b.stimulate(g.antennaR, input.windRight);
+      b.stimulate(g.earL, input.soundLeft ?? 0);
+      b.stimulate(g.earR, input.soundRight ?? 0);
+      b.stimulate(g.smellL, input.smellLeft ?? 0);
+      b.stimulate(g.smellR, input.smellRight ?? 0);
+      b.stimulate(g.touch, input.touch ?? 0);
+      b.stimulate(g.taste, input.taste ?? 0);
     }
     b.step();
     this.mask.fill(0);
@@ -120,6 +146,12 @@ export class InstrumentBrain {
       "seeR",
       "windLeft",
       "windRight",
+      "earL",
+      "earR",
+      "smellL",
+      "smellR",
+      "touch",
+      "taste",
     ]) {
       const group = g[key];
       let count = 0;
@@ -140,6 +172,9 @@ export class InstrumentBrain {
       stepMs: 0,
       simTime: Math.max(0, (b.steps - 25) * b.p.dt),
       dt: b.p.dt,
+      hearing: (this.rates.earL + this.rates.earR) / 2,
+      smell: (this.rates.smellL + this.rates.smellR) / 2,
+      contact: (this.rates.touch + this.rates.taste) / 2,
     };
   }
 }

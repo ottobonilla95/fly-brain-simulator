@@ -2,15 +2,25 @@ import { useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { NeuralState, SensoryInput, WorldState } from "./types";
+import type { NeuralState, SourceKind, WorldSource, WorldState } from "./types";
+import { SOURCE_INFO } from "./environment";
 
 interface Props {
   world: MutableRefObject<WorldState>;
   neural: MutableRefObject<NeuralState>;
-  onInput: (input: SensoryInput) => void;
+  onPlace: (kind: SourceKind, x: number, z: number) => void;
+  onSelect: (id: string) => void;
+  onMove: (id: string, x: number, z: number) => void;
   onError: (error: string) => void;
 }
-export default function Chamber({ world, neural, onInput, onError }: Props) {
+export default function Chamber({
+  world,
+  neural,
+  onPlace,
+  onSelect,
+  onMove,
+  onError,
+}: Props) {
   const mount = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const host = mount.current!;
@@ -35,7 +45,7 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
     renderer.toneMappingExposure = 1.25;
     renderer.domElement.setAttribute(
       "aria-label",
-      "3D fly chamber. Drag to move the stimulus; right-drag to orbit. Arrow keys also move the stimulus.",
+      "3D fly chamber. Pick a sensory source and click to place. Drag placed objects to move them; right-drag to orbit.",
     );
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
@@ -293,63 +303,160 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
     );
     halo.rotation.x = -Math.PI / 2;
     scene.add(halo);
-    const target = new THREE.Group();
-    scene.add(target);
-    const coreMat = new THREE.MeshStandardMaterial({
-      color: 0xf6b46b,
-      emissive: 0xf29b43,
-      emissiveIntensity: 2,
-    });
-    const core = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 24, 16),
-      coreMat,
-    );
-    target.add(core);
-    const targetLight = new THREE.PointLight(0xffb057, 5, 5);
-    target.add(targetLight);
-    for (const radius of [0.24, 0.37]) {
-      const r = new THREE.Mesh(
-        new THREE.TorusGeometry(radius, 0.007, 4, 64),
+    const sourceMeshes = new Map<string, THREE.Group>();
+    const disposeObject = (object: THREE.Object3D) => {
+      object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        mesh.geometry?.dispose();
+        if (mesh.material)
+          for (const material of Array.isArray(mesh.material)
+            ? mesh.material
+            : [mesh.material]) {
+            (material as THREE.MeshStandardMaterial).map?.dispose();
+            material.dispose();
+          }
+      });
+    };
+    const makeSource = (source: WorldSource) => {
+      const info = SOURCE_INFO[source.kind];
+      const group = new THREE.Group();
+      group.userData.sourceId = source.id;
+      const material = new THREE.MeshStandardMaterial({
+        color: info.color,
+        emissive: info.color,
+        emissiveIntensity: 0.3,
+        roughness: 0.45,
+        metalness: 0.25,
+      });
+      const dark = new THREE.MeshStandardMaterial({
+        color: 0x202d29,
+        roughness: 0.5,
+      });
+      const body = new THREE.Group();
+      body.position.y = 1.35;
+      group.add(body);
+      const mesh = (
+        geometry: THREE.BufferGeometry,
+        mat: THREE.Material = material,
+        y = 0,
+      ) => {
+        const object = new THREE.Mesh(geometry, mat);
+        object.position.y = y;
+        object.castShadow = true;
+        body.add(object);
+        return object;
+      };
+      if (source.kind === "sound") {
+        mesh(new THREE.BoxGeometry(0.38, 0.58, 0.28), dark);
+        for (const y of [-0.1, 0.16]) {
+          const cone = mesh(
+            new THREE.CylinderGeometry(
+              y < 0 ? 0.13 : 0.065,
+              y < 0 ? 0.13 : 0.065,
+              0.04,
+              24,
+            ),
+            material,
+            y,
+          );
+          cone.rotation.x = Math.PI / 2;
+          cone.position.z = 0.16;
+        }
+      } else if (source.kind === "smell") {
+        mesh(new THREE.SphereGeometry(0.23, 20, 16));
+        const leaf = mesh(new THREE.SphereGeometry(0.1, 12, 8), dark, 0.25);
+        leaf.scale.set(1.3, 0.35, 0.6);
+        leaf.rotation.z = 0.6;
+      } else if (source.kind === "wind") {
+        mesh(new THREE.TorusGeometry(0.29, 0.035, 8, 32), dark);
+        for (let i = 0; i < 3; i++) {
+          const blade = mesh(new THREE.BoxGeometry(0.11, 0.28, 0.035));
+          const angle = (i * Math.PI * 2) / 3;
+          blade.position.set(Math.sin(angle) * 0.13, Math.cos(angle) * 0.13, 0);
+          blade.rotation.z = -angle;
+        }
+      } else if (source.kind === "touch") {
+        mesh(new THREE.IcosahedronGeometry(0.28, 0));
+      } else if (source.kind === "taste") {
+        mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.1, 24));
+        mesh(new THREE.SphereGeometry(0.12, 16, 12), material, 0.13);
+      } else {
+        mesh(
+          source.kind === "loom"
+            ? new THREE.OctahedronGeometry(0.23)
+            : new THREE.SphereGeometry(0.15, 20, 16),
+        );
+      }
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.32, 0.35, 48),
         new THREE.MeshBasicMaterial({
-          color: 0xefb26c,
+          color: info.color,
           transparent: true,
-          opacity: 0.55,
+          opacity: 0.7,
+          side: THREE.DoubleSide,
         }),
       );
-      r.rotation.x = Math.PI / 2;
-      target.add(r);
-    }
-    const shadow = new THREE.Mesh(
-      new THREE.RingGeometry(0.17, 0.2, 48),
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.025;
+      group.add(ring);
+      group.userData.ring = ring;
+      group.userData.body = body;
+      const stem = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0.03, 0),
+          new THREE.Vector3(0, 1.2, 0),
+        ]),
+        new THREE.LineBasicMaterial({
+          color: info.color,
+          transparent: true,
+          opacity: 0.2,
+        }),
+      );
+      group.add(stem);
+      const wave = new THREE.Mesh(
+        new THREE.TorusGeometry(0.4, 0.008, 4, 48),
+        new THREE.MeshBasicMaterial({
+          color: info.color,
+          transparent: true,
+          opacity: 0.4,
+        }),
+      );
+      wave.rotation.x = Math.PI / 2;
+      body.add(wave);
+      group.userData.wave = wave;
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 80;
+      const c = canvas.getContext("2d")!;
+      c.font = "500 28px sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = info.color;
+      c.fillText(info.label.toUpperCase(), 256, 45);
+      const label = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: new THREE.CanvasTexture(canvas),
+          transparent: true,
+          depthTest: false,
+        }),
+      );
+      label.position.y = 1.98;
+      label.scale.set(1.9, 0.3, 1);
+      group.add(label);
+      scene.add(group);
+      return group;
+    };
+    const placementRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.3, 0.34, 48),
       new THREE.MeshBasicMaterial({
-        color: 0xf0b26c,
+        color: 0xf2b56b,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.7,
         side: THREE.DoubleSide,
       }),
     );
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = 0.02;
-    scene.add(shadow);
-    const projectionGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, -1.8, 0),
-    ]);
-    target.add(
-      new THREE.Line(
-        projectionGeo,
-        new THREE.LineDashedMaterial({
-          color: 0xffc28a,
-          transparent: true,
-          opacity: 0.2,
-          dashSize: 0.08,
-          gapSize: 0.08,
-        }),
-      ),
-    );
-    (
-      target.children[target.children.length - 1] as THREE.Line
-    ).computeLineDistances();
+    placementRing.rotation.x = -Math.PI / 2;
+    placementRing.visible = false;
+    scene.add(placementRing);
     const trailData = new Float32Array(240 * 3);
     const trailGeo = new THREE.BufferGeometry();
     trailGeo.setAttribute("position", new THREE.BufferAttribute(trailData, 3));
@@ -366,46 +473,99 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
     scene.add(trail);
     let trailCount = 0,
       lastTrail = 0,
-      lastInput = 0,
       lastReset = -1,
       lastOverhead = false;
     const ray = new THREE.Raycaster(),
-      pointer = new THREE.Vector2(),
-      plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.8),
-      intersect = new THREE.Vector3();
-    let dragging = false;
-    const placeTarget = (event: PointerEvent) => {
+      pointer = new THREE.Vector2();
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.35);
+    const intersect = new THREE.Vector3();
+    let dragging: string | null = null;
+    const dragOffset = new THREE.Vector2();
+    let pointerInside = false;
+    const aim = (event: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.set(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       ray.setFromCamera(pointer, camera);
-      if (ray.ray.intersectPlane(plane, intersect)) {
-        const len = Math.hypot(intersect.x, intersect.z),
-          factor = len > 4.8 ? 4.8 / len : 1;
-        world.current.targetX = intersect.x * factor;
-        world.current.targetZ = intersect.z * factor;
+    };
+    const bounded = () => {
+      const length = Math.hypot(intersect.x, intersect.z);
+      const factor = length > 4.8 ? 4.8 / length : 1;
+      return { x: intersect.x * factor, z: intersect.z * factor };
+    };
+    const hitSource = () => {
+      for (const hit of ray.intersectObjects(
+        [...sourceMeshes.values()],
+        true,
+      )) {
+        let object: THREE.Object3D | null = hit.object;
+        while (object) {
+          if (object.userData.sourceId)
+            return object.userData.sourceId as string;
+          object = object.parent;
+        }
       }
+      return null;
     };
     const down = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      dragging = true;
+      aim(e);
+      if (
+        world.current.placing &&
+        ray.ray.intersectPlane(floorPlane, intersect)
+      ) {
+        const point = bounded();
+        onPlace(world.current.placing, point.x, point.z);
+        return;
+      }
+      const id = hitSource();
+      if (!id) return;
+      onSelect(id);
+      const source = world.current.sources.find((s) => s.id === id);
+      if (!source || !ray.ray.intersectPlane(dragPlane, intersect)) return;
+      dragOffset.set(source.x - intersect.x, source.z - intersect.z);
+      dragging = id;
       controls.enabled = false;
       renderer.domElement.setPointerCapture(e.pointerId);
-      placeTarget(e);
     };
     const move = (e: PointerEvent) => {
-      if (dragging) placeTarget(e);
+      aim(e);
+      pointerInside = true;
+      if (dragging && ray.ray.intersectPlane(dragPlane, intersect)) {
+        intersect.x += dragOffset.x;
+        intersect.z += dragOffset.y;
+        const point = bounded();
+        onMove(dragging, point.x, point.z);
+      }
+      renderer.domElement.style.cursor = world.current.placing
+        ? "crosshair"
+        : dragging
+          ? "grabbing"
+          : hitSource()
+            ? "grab"
+            : "default";
+      if (ray.ray.intersectPlane(floorPlane, intersect)) {
+        const point = bounded();
+        placementRing.position.set(point.x, 0.03, point.z);
+      }
     };
-    const up = () => {
-      dragging = false;
+    const up = (e: PointerEvent) => {
+      if (renderer.domElement.hasPointerCapture(e.pointerId))
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      dragging = null;
       controls.enabled = true;
+    };
+    const leave = () => {
+      pointerInside = false;
     };
     renderer.domElement.addEventListener("pointerdown", down);
     renderer.domElement.addEventListener("pointermove", move);
     renderer.domElement.addEventListener("pointerup", up);
     renderer.domElement.addEventListener("pointercancel", up);
+    renderer.domElement.addEventListener("pointerleave", leave);
     const observer = new ResizeObserver(() => {
       const width = host.clientWidth,
         height = host.clientHeight;
@@ -416,19 +576,16 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
       }
     });
     observer.observe(host);
-    const clock = new THREE.Clock();
     let raf = 0;
     function animate() {
       raf = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.05),
-        time = clock.elapsedTime,
-        w = world.current,
-        n = neural.current;
+      const w = world.current,
+        n = neural.current,
+        time = w.simTime;
       if (w.reset !== lastReset) {
         trailCount = 0;
-        w.x = -1;
-        w.z = 0.6;
-        w.heading = 1.6;
+        lastTrail = 0;
+        trailGeo.setDrawRange(0, 0);
         lastReset = w.reset;
       }
       if (lastOverhead !== w.overhead) {
@@ -440,24 +597,6 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
           ]),
         );
         lastOverhead = w.overhead;
-      }
-      if (w.running) {
-        // Cruise is an explicit body-controller choice; steering and escape read neural outputs.
-        w.heading +=
-          THREE.MathUtils.clamp(
-            (n.left - n.right) * 0.16 + (n.windLeft - n.windRight) * 0.09,
-            -2,
-            2,
-          ) * delta;
-        const speed = 0.24 + Math.min(0.35, n.wing * 0.015);
-        w.x += Math.sin(w.heading) * speed * delta;
-        w.z += Math.cos(w.heading) * speed * delta;
-        const radius = Math.hypot(w.x, w.z);
-        if (radius > 4.65) {
-          w.x *= 4.65 / radius;
-          w.z *= 4.65 / radius;
-          w.heading += Math.PI * 0.8;
-        }
       }
       const altitude = 1.65 + Math.min(1.3, n.escape * 0.06);
       fly.position.set(
@@ -479,16 +618,59 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
       wings[1].rotation.z = -flap;
       halo.position.set(w.x, 0.04, w.z);
       halo.material.opacity = w.running ? 0.35 : 0.15;
-      target.position.set(w.targetX, 1.8, w.targetZ);
-      shadow.position.x = w.targetX;
-      shadow.position.z = w.targetZ;
-      const isPulse = performance.now() - w.pulse < 450;
-      target.scale.setScalar(
-        isPulse ? 1 + (450 - (performance.now() - w.pulse)) / 200 : 1,
-      );
-      coreMat.emissive.setHex(
-        w.mode === "loom" ? 0xf17c5c : w.mode === "wind" ? 0xa5b5f2 : 0xf29b43,
-      );
+      const ids = new Set(w.sources.map((s) => s.id));
+      for (const [id, group] of sourceMeshes)
+        if (!ids.has(id)) {
+          scene.remove(group);
+          disposeObject(group);
+          sourceMeshes.delete(id);
+        }
+      for (const source of w.sources) {
+        let group = sourceMeshes.get(source.id);
+        if (!group) {
+          group = makeSource(source);
+          sourceMeshes.set(source.id, group);
+        }
+        group.position.set(source.x, 0, source.z);
+        const ring = group.userData.ring as THREE.Mesh<
+          THREE.RingGeometry,
+          THREE.MeshBasicMaterial
+        >;
+        ring.scale.setScalar(source.id === w.selectedId ? 1.35 : 1);
+        ring.material.opacity = source.enabled
+          ? source.id === w.selectedId
+            ? 1
+            : 0.5
+          : 0.15;
+        const body = group.userData.body as THREE.Group;
+        const isPulse =
+          source.kind === "loom" &&
+          source.pulseAt >= 0 &&
+          time >= source.pulseAt &&
+          time - source.pulseAt < 0.45;
+        body.scale.setScalar(
+          isPulse ? 1 + (0.45 - (time - source.pulseAt)) * 2 : 1,
+        );
+        body.position.y =
+          1.35 + (source.enabled ? Math.sin(time * 2 + source.x) * 0.035 : 0);
+        const wave = group.userData.wave as THREE.Mesh<
+          THREE.TorusGeometry,
+          THREE.MeshBasicMaterial
+        >;
+        wave.visible = source.enabled;
+        wave.scale.setScalar(
+          1 +
+            ((time * 0.7) % 1) *
+              (source.kind === "sound" || source.kind === "smell" ? 1.8 : 0.2),
+        );
+        wave.material.opacity =
+          source.strength * (1 - ((time * 0.7) % 1)) * 0.5;
+      }
+      placementRing.visible = !!w.placing && pointerInside;
+      if (w.placing) {
+        placementRing.material.color.set(SOURCE_INFO[w.placing].color);
+        renderer.domElement.style.cursor = "crosshair";
+      }
       grid.visible = w.grid;
       trail.visible = w.trails;
       if (w.running && time - lastTrail > 0.1) {
@@ -500,25 +682,6 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
         trailGeo.setDrawRange(0, trailCount);
         trailGeo.attributes.position.needsUpdate = true;
         lastTrail = time;
-      }
-      if (time - lastInput > 0.05) {
-        const bearing =
-          Math.atan2(w.targetX - w.x, w.targetZ - w.z) - w.heading;
-        const normalized = Math.atan2(Math.sin(bearing), Math.cos(bearing));
-        const inView = Math.abs(normalized) < Math.PI * 0.85;
-        const left = THREE.MathUtils.clamp(0.5 + normalized / 0.7, 0, 1);
-        const amount = w.intensity * (inView ? 1 : 0);
-        const input: SensoryInput = {
-          left: w.mode === "target" ? amount * left : 0,
-          right: w.mode === "target" ? amount * (1 - left) : 0,
-          looming: w.mode === "loom" && isPulse ? w.intensity : 0,
-          windLeft: w.mode === "wind" ? amount * left : 0,
-          windRight: w.mode === "wind" ? amount * (1 - left) : 0,
-          enabled: !w.isolated,
-        };
-        w.input = input;
-        onInput(input);
-        lastInput = time;
       }
       controls.update();
       renderer.render(scene, camera);
@@ -532,19 +695,11 @@ export default function Chamber({ world, neural, onInput, onError }: Props) {
       renderer.domElement.removeEventListener("pointermove", move);
       renderer.domElement.removeEventListener("pointerup", up);
       renderer.domElement.removeEventListener("pointercancel", up);
-      scene.traverse((object) => {
-        const mesh = object as THREE.Mesh;
-        mesh.geometry?.dispose();
-        if (mesh.material) {
-          for (const m of Array.isArray(mesh.material)
-            ? mesh.material
-            : [mesh.material])
-            m.dispose();
-        }
-      });
+      renderer.domElement.removeEventListener("pointerleave", leave);
+      disposeObject(scene);
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [world, neural, onInput, onError]);
+  }, [world, neural, onPlace, onSelect, onMove, onError]);
   return <div className="chamber-canvas" ref={mount} />;
 }

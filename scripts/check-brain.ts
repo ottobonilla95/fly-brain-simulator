@@ -39,6 +39,10 @@ const conditions = {
   right: { ...silent, right: 1 },
   loom: { ...silent, looming: 0.8 },
   wind: { ...silent, windLeft: 0.8 },
+  sound: { ...silent, soundLeft: 0.8 },
+  smell: { ...silent, smellLeft: 0.8 },
+  touch: { ...silent, touch: 0.8 },
+  taste: { ...silent, taste: 0.8 },
 };
 const result: Record<string, Record<string, number>> = {};
 for (const [name, input] of Object.entries(conditions)) {
@@ -57,6 +61,9 @@ for (const [name, input] of Object.entries(conditions)) {
         "wing",
         "windLeft",
         "windRight",
+        "hearing",
+        "smell",
+        "contact",
       ] as const)
         totals[key] = (totals[key] || 0) + state[key] / 100;
   }
@@ -79,13 +86,37 @@ assert(
   result.wind.windLeft > result.wind.windRight + 1,
   "Left wind should drive ipsilateral wind DNs",
 );
+assert(
+  result.sound.hearing > result.baseline.hearing + 5,
+  "Sound must activate hearing neurons",
+);
+assert(
+  result.smell.smell > result.baseline.smell + 5,
+  "Food odour must activate olfactory neurons",
+);
+assert(
+  result.touch.contact > result.baseline.contact + 2,
+  "Touch must activate contact neurons",
+);
+assert(
+  result.taste.contact > result.baseline.contact + 2,
+  "Taste must activate contact neurons",
+);
 // Stimulus isolation must be exactly equivalent to no stimulus for a fixed seed.
 const a = new InstrumentBrain(meta, weights, 42),
   b = new InstrumentBrain(meta, weights, 42);
 for (let i = 0; i < 30; i++)
   assert.deepEqual(
     a.step(silent),
-    b.step({ ...conditions.left, looming: 0.8, enabled: false }),
+    b.step({
+      ...conditions.left,
+      looming: 0.8,
+      soundLeft: 0.8,
+      smellLeft: 0.8,
+      touch: 0.8,
+      taste: 0.8,
+      enabled: false,
+    }),
   );
 writeFileSync(
   "brain-verification.json",
@@ -102,5 +133,5 @@ writeFileSync(
   ),
 );
 console.log(
-  "PASS: left/right tracking, looming escape, wind and input isolation.",
+  "PASS: tracking, escape, wind, sound, smell, touch, taste and complete input isolation.",
 );

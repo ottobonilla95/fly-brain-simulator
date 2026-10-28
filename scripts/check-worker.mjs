@@ -19,7 +19,9 @@ const worker = new Worker(
 );
 const messages = [];
 let workerError;
-worker.on("message", (data) => messages.push(data));
+worker.on("message", (data) =>
+  messages.push({ ...data, receivedAt: performance.now() }),
+);
 worker.on("error", (error) => {
   workerError = error;
 });
@@ -98,6 +100,85 @@ try {
       m.state.simTime >= 0.6 &&
       m.state.escape > 5,
   );
+  worker.postMessage({ type: "running", value: false });
+  await sleep(100);
+  worker.postMessage({ type: "reset" });
+  worker.postMessage({ type: "speed", value: 2 });
+  const combinedStart = messages.length;
+  const sources = ["sound", "smell", "taste", "touch"].map((kind, i) => ({
+    id: `source-${i}`,
+    kind,
+    x: -1,
+    z: 0.7,
+    strength: 1,
+    enabled: true,
+    visible: false,
+    pulseAt: -1,
+  }));
+  worker.postMessage({
+    type: "environment",
+    value: { sources, isolated: false },
+  });
+  worker.postMessage({ type: "running", value: true });
+  const combined = await waitFor(
+    (m) =>
+      m.type === "state" &&
+      messages.indexOf(m) >= combinedStart &&
+      m.state.simTime > 0.3 &&
+      m.state.hearing > 5 &&
+      m.state.smell > 5 &&
+      m.state.contact > 5,
+  );
+  assert(
+    Math.hypot(combined.pose.x + 1, combined.pose.z - 0.6) > 0.05,
+    "Body must advance along with brain time",
+  );
+  assert(combined.input.soundLeft + combined.input.soundRight > 0);
+  worker.postMessage({
+    type: "environment",
+    value: { sources, isolated: true },
+  });
+  const isolationStart = messages.length;
+  const isolated = await waitFor(
+    (m) =>
+      m.type === "state" &&
+      messages.indexOf(m) >= isolationStart &&
+      m.input.enabled === false,
+  );
+  assert(
+    Object.entries(isolated.input).every(
+      ([key, value]) => key === "enabled" || value === 0,
+    ),
+  );
+  async function measureSpeed(value) {
+    worker.postMessage({ type: "running", value: false });
+    await sleep(80);
+    worker.postMessage({ type: "reset" });
+    worker.postMessage({ type: "speed", value });
+    const start = messages.length;
+    worker.postMessage({ type: "running", value: true });
+    await sleep(1200);
+    worker.postMessage({ type: "running", value: false });
+    await sleep(80);
+    const states = messages.slice(start).filter((m) => m.type === "state");
+    assert(states.length >= 5);
+    const first = states[0],
+      last = states.at(-1);
+    return (
+      (last.state.simTime - first.state.simTime) /
+      ((last.receivedAt - first.receivedAt) / 1000)
+    );
+  }
+  const halfSpeed = await measureSpeed(0.5);
+  const doubleSpeed = await measureSpeed(2);
+  assert(
+    halfSpeed > 0.35 && halfSpeed < 0.75,
+    `Half-speed clock: ${halfSpeed}`,
+  );
+  assert(
+    doubleSpeed > halfSpeed * 2,
+    `Faster clock must advance more neural steps: ${doubleSpeed}`,
+  );
   writeFileSync(
     "worker-verification.json",
     JSON.stringify(
@@ -112,19 +193,25 @@ try {
           "reset restores simulation clock",
           "resume and looming escape",
           "noise control accepted",
+          "combined sound, smell, touch and taste sources activate sensory neurons",
+          "worker advances body with neural time",
+          "environment isolation clears all input channels",
+          "0.5x and 2x change measured neural clock speed",
         ],
         neurons: ready.neurons,
         synapses: ready.synapses,
         populations: ready.populations,
         tracking: tracking.state,
         escape: escape.state,
+        combined: combined.state,
+        measuredSpeed: { halfSpeed, doubleSpeed },
       },
       null,
       2,
     ),
   );
   console.log(
-    "PASS: production worker loads over HTTP, tracks, pauses, resets and resumes with an escape response.",
+    "PASS: production worker loads, tracks, pauses, resets, combines senses, isolates input, advances the body and changes simulation speed.",
   );
 } finally {
   await worker.terminate();

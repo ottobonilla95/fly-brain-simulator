@@ -17,7 +17,6 @@ import {
   CircleStop,
   Expand,
   Eye,
-  Focus,
   Grid2X2,
   Headphones,
   Leaf,
@@ -28,52 +27,20 @@ import {
   Play,
   Radio,
   RotateCcw,
-  ScanLine,
-  SlidersHorizontal,
   Sparkles,
   Volume2,
   VolumeX,
   Waves,
-  Wind,
   X,
   Zap,
 } from "lucide-react";
 import { NeuralAudio } from "./audio";
 import { EMPTY_NEURAL } from "./types";
-import type {
-  NeuralState,
-  SensoryInput,
-  StimulusMode,
-  WorldState,
-} from "./types";
+import { initialSources, INITIAL_POSE, SOURCE_INFO } from "./environment";
+import SourcePanel from "./SourcePanel";
+import type { NeuralState, SourceKind, WorldSource, WorldState } from "./types";
 const Chamber = lazy(() => import("./Chamber"));
 
-const MODES = [
-  {
-    id: "target" as const,
-    label: "Moving target",
-    icon: Focus,
-    cells: "LC10a",
-    description:
-      "Drag the amber light. Its bearing drives the left and right target-tracking neurons.",
-  },
-  {
-    id: "loom" as const,
-    label: "Approaching object",
-    icon: ScanLine,
-    cells: "LC4 · LPLC2",
-    description:
-      "Send a looming pulse to the escape pathway. Listen for the percussive response.",
-  },
-  {
-    id: "wind" as const,
-    label: "Wind",
-    icon: Wind,
-    cells: "Johnston’s organ",
-    description:
-      "Move the light to set the wind direction relative to the fly. Antenna neurons receive the input.",
-  },
-];
 const palette = ["#d0edaa", "#bfb5e4", "#e5aa83"];
 const brainDots = Array.from({ length: 136 }, (_, i) => {
   const a = i * 2.39996,
@@ -229,8 +196,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false),
     [sound, setSound] = useState(false);
-  const [mode, setMode] = useState<StimulusMode>("target"),
-    [intensity, setIntensity] = useState(0.85);
+  const [sources, setSources] = useState(initialSources);
+  const [selectedId, setSelectedId] = useState<string | null>("target-1");
+  const [placing, setPlacing] = useState<SourceKind | null>(null);
+  const [speed, setSpeed] = useState(1);
+  const [actualSpeed, setActualSpeed] = useState(0);
   const [volume, setVolume] = useState(0.5),
     [mix, setMix] = useState([0.65, 0.65, 0.6]),
     [noise, setNoise] = useState(1);
@@ -255,17 +225,14 @@ export default function App() {
     { t: number; left: number; right: number; escape: number; wing: number }[]
   >([]);
   const world = useRef<WorldState>({
-    x: -1,
-    z: 0.6,
-    heading: 1.6,
-    targetX: 2,
-    targetZ: -1,
+    ...INITIAL_POSE,
     running: false,
     trails: true,
     grid: true,
-    mode: "target",
-    intensity: 0.85,
-    pulse: 0,
+    sources,
+    selectedId: "target-1",
+    placing: null,
+    simTime: 0,
     reset: 0,
     overhead: false,
     isolated: false,
@@ -296,6 +263,9 @@ export default function App() {
       if (data.type === "state") {
         const state: NeuralState = data.state;
         neural.current = state;
+        world.current.simTime = state.simTime;
+        if (data.pose) Object.assign(world.current, data.pose);
+        if (data.input) world.current.input = data.input;
         audio.update(state, world.current.running);
         samples.current.push({
           t: state.simTime,
@@ -307,6 +277,7 @@ export default function App() {
         if (samples.current.length > 6000) samples.current.shift();
         if (performance.now() - lastUi.current > 100) {
           setN(state);
+          setActualSpeed(data.actualSpeed ?? 0);
           setHistory((prev) =>
             [state.left + state.right, state.wing, state.escape].map((v, i) => [
               ...prev[i].slice(-79),
@@ -359,8 +330,66 @@ export default function App() {
     const timer = setTimeout(() => setNotice(""), 6000);
     return () => clearTimeout(timer);
   }, [notice]);
-  const onInput = useCallback((input: SensoryInput) => {
-    worker.current?.postMessage({ type: "input", value: input });
+  useEffect(() => {
+    world.current.sources = sources;
+    world.current.isolated = isolated;
+    worker.current?.postMessage({
+      type: "environment",
+      value: { sources, isolated },
+    });
+  }, [sources, isolated]);
+  useEffect(() => {
+    worker.current?.postMessage({ type: "speed", value: speed });
+  }, [speed]);
+  const selectSource = useCallback((id: string) => {
+    world.current.selectedId = id;
+    world.current.placing = null;
+    setSelectedId(id);
+    setPlacing(null);
+  }, []);
+  const chooseSource = useCallback((kind: SourceKind | null) => {
+    world.current.placing = kind;
+    setPlacing(kind);
+    if (kind)
+      chamber.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+  const editSource = useCallback((id: string, patch: Partial<WorldSource>) => {
+    setSources((prev) =>
+      prev.map((source) =>
+        source.id === id
+          ? { ...source, ...patch, id: source.id, kind: source.kind }
+          : source,
+      ),
+    );
+  }, []);
+  const placeSource = useCallback(
+    (kind: SourceKind, x: number, z: number) => {
+      const id = crypto.randomUUID();
+      setSources((prev) => [
+        ...prev,
+        {
+          id,
+          kind,
+          x,
+          z,
+          strength: 0.85,
+          visible: kind === "target" || kind === "loom",
+          enabled: true,
+          pulseAt: -1,
+        },
+      ]);
+      selectSource(id);
+    },
+    [selectSource],
+  );
+  const moveSource = useCallback(
+    (id: string, x: number, z: number) => editSource(id, { x, z }),
+    [editSource],
+  );
+  const removeSource = useCallback((id: string) => {
+    setSources((prev) => prev.filter((source) => source.id !== id));
+    world.current.selectedId = null;
+    setSelectedId(null);
   }, []);
   const onSceneError = useCallback(
     (message: string) => setSceneError(message),
@@ -392,13 +421,10 @@ export default function App() {
       worker.current?.postMessage({ type: "running", value });
     }
   }, [phase, audio]);
-  const selectMode = useCallback((value: StimulusMode) => {
-    setMode(value);
-    world.current.mode = value;
-  }, []);
   const pulse = useCallback(() => {
-    world.current.pulse = performance.now();
-  }, []);
+    const id = world.current.selectedId;
+    if (id) editSource(id, { pulseAt: world.current.simTime });
+  }, [editSource]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
@@ -412,30 +438,32 @@ export default function App() {
         e.preventDefault();
         toggleRun();
       }
-      if (e.key.toLowerCase() === "t") selectMode("target");
-      if (e.key.toLowerCase() === "l") selectMode("loom");
-      if (e.key.toLowerCase() === "w") selectMode("wind");
-      if (e.key === "Enter" && world.current.mode === "loom") pulse();
+      if (e.key === "Escape") chooseSource(null);
+      if (e.key.toLowerCase() === "t") chooseSource("target");
+      if (e.key.toLowerCase() === "l") chooseSource("loom");
+      if (e.key.toLowerCase() === "w") chooseSource("wind");
+      const selected = world.current.sources.find(
+        (s) => s.id === world.current.selectedId,
+      );
+      if (e.key === "Enter" && selected?.kind === "loom") pulse();
+      if (e.key === "Delete" && selected) removeSource(selected.id);
       const arrows: Record<string, [number, number]> = {
         ArrowLeft: [-0.3, 0],
         ArrowRight: [0.3, 0],
         ArrowUp: [0, -0.3],
         ArrowDown: [0, 0.3],
       };
-      if (arrows[e.key]) {
+      if (arrows[e.key] && selected) {
         e.preventDefault();
         const [x, z] = arrows[e.key];
-        const nx = world.current.targetX + x,
-          nz = world.current.targetZ + z;
-        if (Math.hypot(nx, nz) < 4.8) {
-          world.current.targetX = nx;
-          world.current.targetZ = nz;
-        }
+        const nx = selected.x + x,
+          nz = selected.z + z;
+        if (Math.hypot(nx, nz) < 4.8) moveSource(selected.id, nx, nz);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleRun, selectMode, pulse, dialog]);
+  }, [toggleRun, chooseSource, moveSource, removeSource, pulse, dialog]);
   const toggleSound = async () => {
     if (!sound) {
       try {
@@ -448,9 +476,10 @@ export default function App() {
   };
   const reset = () => {
     world.current.reset++;
-    world.current.targetX = 2;
-    world.current.targetZ = -1;
-    world.current.pulse = 0;
+    Object.assign(world.current, INITIAL_POSE);
+    world.current.simTime = 0;
+    setSources((prev) => prev.map((s) => ({ ...s, pulseAt: -1 })));
+    setActualSpeed(0);
     neural.current = { ...EMPTY_NEURAL };
     setN({ ...EMPTY_NEURAL });
     setHistory([[], [], []]);
@@ -495,7 +524,7 @@ export default function App() {
               upstream: "59ff122b39e0f0b51bea9131324f4350c9a57318",
               model: "MaleCNS v1.0 · simplified LIF",
               seed: 64,
-              settings: { mode, intensity, noise, isolated, volume, mix },
+              settings: { sources, speed, noise, isolated, volume, mix },
               samples: samples.current,
             },
             null,
@@ -515,7 +544,7 @@ export default function App() {
         .catch(() => setNotice("Fullscreen is unavailable in this browser."));
     else void document.exitFullscreen();
   };
-  const modeInfo = MODES.find((m) => m.id === mode)!;
+
   const status =
     phase === "loading"
       ? "Loading brain"
@@ -626,7 +655,7 @@ export default function App() {
             <div
               className="scene-area"
               tabIndex={0}
-              aria-label="Chamber controls: arrow keys move the stimulus, space pauses, T selects target, L selects looming, W selects wind"
+              aria-label="Chamber controls: click to place a source, drag sources to move, arrow keys move selected source, space pauses"
             >
               <Suspense
                 fallback={
@@ -636,7 +665,9 @@ export default function App() {
                 <Chamber
                   world={world}
                   neural={neural}
-                  onInput={onInput}
+                  onPlace={placeSource}
+                  onSelect={selectSource}
+                  onMove={moveSource}
                   onError={onSceneError}
                 />
               </Suspense>
@@ -652,13 +683,11 @@ export default function App() {
                   CONNECTOME 001<span>166,700 neurons</span>
                 </span>
               </div>
-              <div className="stimulus-tag">
+              <div className="stimulus-tag" role="status">
                 <span className="amber-dot" />{" "}
-                {mode === "wind"
-                  ? "WIND SOURCE"
-                  : mode === "loom"
-                    ? "LOOMING STIMULUS"
-                    : "VISUAL TARGET"}
+                {placing
+                  ? `CLICK TO PLACE ${SOURCE_INFO[placing].label.toUpperCase()}`
+                  : `${sources.length} SENSORY SOURCE${sources.length === 1 ? "" : "S"}`}
               </div>
               {phase === "idle" && (
                 <div className="init-card">
@@ -705,8 +734,8 @@ export default function App() {
             </div>
             <div className="scene-bottom">
               <span>
-                <MousePointer2 size={13} /> Drag to move the stimulus{" "}
-                <span className="shortcut">↑ ↓ ← →</span>
+                <MousePointer2 size={13} /> Pick a source · click to place ·
+                drag to move <span className="shortcut">↑ ↓ ← →</span>
               </span>
               <button
                 className={trails ? "trail-on" : ""}
@@ -754,6 +783,23 @@ export default function App() {
                 </span>
               </div>
               <div className="transport-right">
+                <div
+                  className="speed-control"
+                  role="group"
+                  aria-label="Simulation speed"
+                >
+                  {[0.5, 1, 2, 5].map((value) => (
+                    <button
+                      key={value}
+                      aria-label={`Simulation speed ${value}x`}
+                      aria-pressed={speed === value}
+                      className={speed === value ? "active" : ""}
+                      onClick={() => setSpeed(value)}
+                    >
+                      {value}×
+                    </button>
+                  ))}
+                </div>
                 <span className="transport-status">
                   <span className={`status-dot ${running ? "live" : ""}`} />
                   {status}
@@ -770,66 +816,17 @@ export default function App() {
             </div>
           </section>
           <aside className="sidebar">
-            <section className="stimulus-panel">
-              <div className="section-heading">
-                <h2>
-                  <SlidersHorizontal size={14} /> Stimulus
-                </h2>
-                <span>INPUT</span>
-              </div>
-              <div
-                className="mode-list"
-                role="group"
-                aria-label="Stimulus type"
-              >
-                {MODES.map(({ id, label, icon: Icon }, i) => (
-                  <button
-                    key={id}
-                    className={`mode-button ${mode === id ? "active" : ""}`}
-                    aria-pressed={mode === id}
-                    onClick={() => selectMode(id)}
-                  >
-                    <Icon size={16} />
-                    <span>{label}</span>
-                    <kbd>{["T", "L", "W"][i]}</kbd>
-                    {mode === id && <span className="mode-indicator" />}
-                  </button>
-                ))}
-              </div>
-              <div className="stimulus-description">
-                <span className="mono cell-chip">{modeInfo.cells}</span>
-                <p>{modeInfo.description}</p>
-              </div>
-              {mode === "loom" && (
-                <button
-                  className="pulse-button"
-                  disabled={!running}
-                  onClick={pulse}
-                >
-                  <Zap size={14} /> Send looming pulse <kbd>↵</kbd>
-                </button>
-              )}
-              <label className="slider-label" htmlFor="stimulus-strength">
-                Stimulus strength <span>{Math.round(intensity * 100)}%</span>
-              </label>
-              <input
-                id="stimulus-strength"
-                type="range"
-                min="0"
-                max="1"
-                step=".01"
-                value={intensity}
-                onChange={(e) => {
-                  const v = +e.target.value;
-                  setIntensity(v);
-                  world.current.intensity = v;
-                }}
-              />
-              <div className="range-labels">
-                <span>SUBTLE</span>
-                <span>STRONG</span>
-              </div>
-            </section>
+            <SourcePanel
+              sources={sources}
+              selectedId={selectedId}
+              placing={placing}
+              neural={n}
+              onChoose={chooseSource}
+              onSelect={selectSource}
+              onEdit={editSource}
+              onRemove={removeSource}
+              onPulse={pulse}
+            />
             <section className="activity-panel">
               <div className="section-heading">
                 <h2>
@@ -1032,9 +1029,13 @@ export default function App() {
             <span className="footer-sep">/</span> 25.1M connections
           </span>
           <div>
-            <span className={n.stepMs > 20 ? "performance-slow" : ""}>
+            <span
+              className={
+                running && actualSpeed < speed * 0.8 ? "performance-slow" : ""
+              }
+            >
               {phase === "ready"
-                ? `${n.stepMs.toFixed(1)} ms / step${n.stepMs > 20 ? " · slower than real time" : ""}`
+                ? `${(running ? actualSpeed : 0).toFixed(1)}× actual / ${speed}× requested · ${n.stepMs.toFixed(1)} ms / step`
                 : "20 ms simulation step"}
             </span>
             <button onClick={exportSession}>
@@ -1115,10 +1116,11 @@ function ModelDialog({ close }: { close: () => void }) {
         </div>
         <h3>01 / The input is measured, not seen</h3>
         <p>
-          The scene calculates a target’s bearing from the fly. A hand-written
-          encoder adds simulated voltage to identified target-tracking neurons
-          (LC10a), looming neurons (LC4/LPLC2), or antenna neurons. No image
-          recognition runs here.
+          Placed sources stimulate visual, hearing, smell, wind, touch and taste
+          neurons. Direction, distance and contact determine input strength.
+          Visibility can be combined with another sense on the same object. No
+          image recognition runs here; the inputs are numerical sensory
+          features.
         </p>
         <h3>02 / The connectome supplies the connections</h3>
         <p>
