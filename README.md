@@ -18,7 +18,8 @@ Open the Local URL Vite prints. Press **Start instrument** to load the bundled 5
 - Choose a source under **World sources**, then click inside the chamber to place it. Add several sources at once: visual targets, approaching threats, sound, food smell, wind, touch and taste.
 - Click a placed object or its list entry to select it. Drag objects or use the arrow keys to move the selected source. Right-drag to orbit; scroll to zoom.
 - Adjust each source’s strength, enable/disable it, remove it, or turn **Visible to fly** on to combine its primary sense with vision. All editor markers remain visible to you.
-- Approaching threats have a **Send looming pulse** button (also Enter). Touch and taste activate within 0.6 world units; sound, smell and wind fade with distance.
+- Visible threats activate automatically as they approach or come close ahead. Escape-neuron activity triggers a turn and brief dash. A **Send looming pulse** button (also Enter) is available for manual stimulation.
+- Food smell is followed using an added decoder of left/right smell-neuron activity. This is an authored movement policy, not innate behavior supplied by the upstream repo. Touch and taste activate within 0.6 world units; sound, smell and wind fade with distance.
 - **0.5× / 1× / 2× / 5×** controls neural and world simulation speed together. The footer shows achieved speed, which may be lower than requested on slower hardware.
 - **T / L / W**: pick a visual target, threat or wind source for placement. **Escape** cancels placement; **Delete** removes the selected source.
 - **Space**: pause/resume. Buttons and sliders retain their normal keyboard behavior.
@@ -39,13 +40,14 @@ The scene supplies numerical sensory features, not camera images. Musical tuning
 ```sh
 npm run check:environment
 npm run check:brain
+npm run check:behavior
 npm run build
 npm run preview -- --port 5174 --strictPort
 # In another terminal:
 npm run check:worker
 ```
 
-The environment check covers direction, distance, visibility, contact, combined inputs and simulation-time pulse expiry. The brain check loads bundled data and measures tracking, escape, wind, hearing, smell, touch, taste and isolation. The worker check exercises the compiled worker, streamed HTTP loader, pause/resume, reset, combined sensory sources, body movement and measured playback speeds. Node worker threads supply a small messaging shim for that integration test; it does not validate browser rendering or audio playback.
+The environment check covers direction, distance, visibility, contact, combined inputs and simulation-time pulse expiry. The brain check loads bundled data and measures tracking, escape, wind, hearing, smell, touch, taste and isolation. The behavior check runs the full source → neural activity → body loop with normal background noise and asserts measurable movement away from threats and toward smell-only food on either side, with hidden/disabled controls and a competing visual target. The worker check exercises the compiled worker, streamed HTTP loader, pause/resume, reset, combined sensory sources, body movement, measured playback speeds and both escape and food seeking. Node worker threads supply a small messaging shim for that integration test; it does not validate browser rendering or audio playback.
 
 ## Source and attribution
 

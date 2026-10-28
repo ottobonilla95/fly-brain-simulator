@@ -23,15 +23,15 @@ We do not train the network or a readout. Input strengths and sound mappings are
 
 Several placed sources may be active at once. Each has a position, strength, on/off switch and independent visibility flag. Contributions sum per channel and are capped at 1. These are authored numerical encoders, not physical models of light, acoustics or fluid flow.
 
-- **Vision:** Visible objects drive LC10a on the side of their bearing within ±153°. The side split interpolates within ±0.35 radians. Strength attenuates with horizontal distance as `strength / (1 + (distance / 2.5)^2)`.
-- **Loom:** A selected threat emits a user-triggered 450 ms pulse of bilateral LC4/LPLC2 stimulation when in view. Pulse duration uses simulation time. This is an explicit pulse, not automatic image-based looming detection.
+- **Vision:** Visible objects other than threats drive LC10a on the side of their bearing within ±153°. The side split interpolates within ±0.35 radians. Strength attenuates with horizontal distance as `strength / (1 + (distance / 2.5)^2)`.
+- **Loom:** Visible threats stimulate bilateral LC4/LPLC2 when their angular size grows (estimated from relative distance between neural steps), or when within 1.6 units in the frontal hemisphere. This follows the upstream drone’s angular-growth and near-threat encoder pattern, with chosen gains and proximity thresholds. Threats do not also stimulate target-chasing LC10a. The manual 450 ms pulse remains available; timing and growth use simulation time. No rendered image is processed.
 - **Wind:** Source direction splits stimulation of the upstream drone example’s wind-sensitive Johnston’s-organ neurons. Wind uses the same distance falloff.
 - **Sound:** Source direction and distance drive JO-A/JO-B hearing populations. A speaker is a neural stimulus source; the existing instrument soundtrack is a separate audio output.
 - **Smell:** Food sources stimulate ORN_DM1/ORN_DM2, with directional split and distance falloff, including behind the fly. The supplied export already has `sensory_input: false`, avoiding the upstream sensory-neuron feedback problem.
 - **Touch / taste:** Contact within 0.6 horizontal world units drives BM_InOm or claw_tpGRN/dorsal_tpGRN/BM_Taste respectively. This is proximity-based contact, not a physics collision solver.
 - **Isolation:** Disables every external stimulation channel. Intrinsic dynamics and background noise continue.
 
-Hearing, smell and contact readouts measure actual sensory-population firing rates. No new approach-to-food or turn-toward-sound rule is scripted; those inputs may change network activity without producing obvious locomotion through the existing motor decoder.
+Hearing, smell and contact readouts measure actual sensory-population firing rates. Food seeking is an explicitly added motor decoder using left/right smell-neuron firing rates, not evidence that innate food-seeking emerges through the original motor circuits. Sound and contact still have no added locomotor policy; their neural responses may not produce obvious movement.
 
 The visual front end bypasses the photoreceptors and lamina. In the upstream simplified model, that early visual route does not successfully relay the signal. The network receives numeric drive, never a rendered image or an image embedding.
 
@@ -40,7 +40,8 @@ The visual front end bypasses the photoreceptors and lamina. In the upstream sim
 Rates are exponentially smoothed (160 ms time constant) and normalized by population size, in Hz per neuron.
 
 - Steering: DNa02, DNg111, DNae002, split left/right, following upstream Pong. Their difference turns the specimen and pans a harmonic voice.
-- Escape: DNp01. Its rate raises the specimen; upward threshold crossings at 5 Hz trigger a synthesized falling-pitch drum, with a 300 ms minimum retrigger interval.
+- Escape: DNp01. Its rate raises the specimen. Activity at or above 5 Hz for 60 ms reverses heading and adds 1.8 world units/s for a 650 ms dash, using a latch that rearms below 2 Hz. This is an authored motor interpretation driven by the escape circuit; it does not read the threat’s coordinates. The same 5 Hz crossing triggers percussion with a 300 ms minimum retrigger interval.
+- Food seeking: normalized left-minus-right ORN_DM1/DM2 firing rates add steering, with a confidence gate above resting sensory activity. A strong olfactory signal reduces visual steering to 25% so a competing visual target does not pull the fly away from food. It reads measured neuron activity, not object coordinates or injected strengths. Escape bursts temporarily suppress food-seeking steering. This is an added decoder, not an upstream behavior or trained readout.
 - Wings: the explicit wing motor neuron list in upstream `flytalk.py`. Population activity controls the amplitude and small pitch changes of a designed tone.
 - Wind outputs: DNg05_a, DNg06_a, DNg29, DNge016. Their left/right difference contributes to turning.
 

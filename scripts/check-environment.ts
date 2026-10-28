@@ -47,12 +47,41 @@ for (const kind of ["touch", "taste"] as const) {
   );
   assert(encodeSources([source({ kind, x: 0.2, z: 0 })], pose, 0)[kind]! > 0);
 }
-const threat = source({ kind: "loom", pulseAt: 1 });
+const threat = source({ kind: "loom", x: 0, z: 4, visible: true, pulseAt: 1 });
 assert(encodeSources([threat], pose, 1.2).looming > 0);
 assert.equal(
   encodeSources([threat], pose, 1.5).looming,
   0,
   "Loom pulse must expire in simulation time",
+);
+const history = new Map();
+encodeSources(
+  [source({ kind: "loom", visible: true, x: 0, z: 4 })],
+  pose,
+  0,
+  false,
+  history,
+);
+assert(
+  encodeSources(
+    [source({ kind: "loom", visible: true, x: 0, z: 3 })],
+    pose,
+    0.02,
+    false,
+    history,
+  ).looming > 0,
+  "A growing threat must stimulate looming without a button press",
+);
+assert(
+  encodeSources([source({ kind: "loom", visible: true, x: 0, z: 1 })], pose, 0)
+    .looming > 0,
+  "A nearby frontal threat must be detected automatically",
+);
+assert.equal(
+  encodeSources([source({ kind: "loom", visible: true, x: 0, z: -1 })], pose, 0)
+    .looming,
+  0,
+  "An unseen threat must not stimulate vision",
 );
 const combined = encodeSources(
   [source({}), source({ kind: "smell" }), source({ kind: "wind" })],

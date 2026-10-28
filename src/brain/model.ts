@@ -174,6 +174,8 @@ export class InstrumentBrain {
       dt: b.p.dt,
       hearing: (this.rates.earL + this.rates.earR) / 2,
       smell: (this.rates.smellL + this.rates.smellR) / 2,
+      smellLeft: this.rates.smellL,
+      smellRight: this.rates.smellR,
       contact: (this.rates.touch + this.rates.taste) / 2,
     };
   }

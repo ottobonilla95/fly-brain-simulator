@@ -179,6 +179,57 @@ try {
     doubleSpeed > halfSpeed * 2,
     `Faster clock must advance more neural steps: ${doubleSpeed}`,
   );
+  worker.postMessage({ type: "noise", value: 1 });
+  worker.postMessage({ type: "reset" });
+  worker.postMessage({ type: "speed", value: 5 });
+  const threatSource = {
+    id: "automatic-threat",
+    kind: "loom",
+    x: -1 + Math.sin(1.6) * 1.3,
+    z: 0.6 + Math.cos(1.6) * 1.3,
+    strength: 0.85,
+    visible: true,
+    enabled: true,
+    pulseAt: -1,
+  };
+  const threatStart = messages.length;
+  worker.postMessage({
+    type: "environment",
+    value: { sources: [threatSource], isolated: false },
+  });
+  worker.postMessage({ type: "running", value: true });
+  const escaped = await waitFor(
+    (m) =>
+      m.type === "state" &&
+      messages.indexOf(m) >= threatStart &&
+      m.pose.escapeUntil > 0 &&
+      Math.hypot(m.pose.x - threatSource.x, m.pose.z - threatSource.z) > 2,
+  );
+  worker.postMessage({ type: "running", value: false });
+  await sleep(80);
+  worker.postMessage({ type: "reset" });
+  const foodSource = {
+    ...threatSource,
+    id: "food",
+    kind: "smell",
+    x: -1,
+    z: 3.2,
+    visible: false,
+  };
+  const foodStart = messages.length;
+  worker.postMessage({
+    type: "environment",
+    value: { sources: [foodSource], isolated: false },
+  });
+  worker.postMessage({ type: "running", value: true });
+  const reachedFood = await waitFor(
+    (m) =>
+      m.type === "state" &&
+      messages.indexOf(m) >= foodStart &&
+      m.state.simTime > 1 &&
+      Math.hypot(m.pose.x - foodSource.x, m.pose.z - foodSource.z) < 0.6,
+  );
+  worker.postMessage({ type: "running", value: false });
   writeFileSync(
     "worker-verification.json",
     JSON.stringify(
@@ -197,6 +248,8 @@ try {
           "worker advances body with neural time",
           "environment isolation clears all input channels",
           "0.5x and 2x change measured neural clock speed",
+          "automatic threat triggers a visible escape carrying the body away",
+          "smell-only food source is reached by olfactory motor decoding",
         ],
         neurons: ready.neurons,
         synapses: ready.synapses,
@@ -205,6 +258,21 @@ try {
         escape: escape.state,
         combined: combined.state,
         measuredSpeed: { halfSpeed, doubleSpeed },
+        automaticEscape: {
+          pose: escaped.pose,
+          distance: Math.hypot(
+            escaped.pose.x - threatSource.x,
+            escaped.pose.z - threatSource.z,
+          ),
+        },
+        foodSeeking: {
+          simTime: reachedFood.state.simTime,
+          pose: reachedFood.pose,
+          distance: Math.hypot(
+            reachedFood.pose.x - foodSource.x,
+            reachedFood.pose.z - foodSource.z,
+          ),
+        },
       },
       null,
       2,

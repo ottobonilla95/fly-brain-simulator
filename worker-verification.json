@@ -12,7 +12,9 @@
     "combined sound, smell, touch and taste sources activate sensory neurons",
     "worker advances body with neural time",
     "environment isolation clears all input channels",
-    "0.5x and 2x change measured neural clock speed"
+    "0.5x and 2x change measured neural clock speed",
+    "automatic threat triggers a visible escape carrying the body away",
+    "smell-only food source is reached by olfactory motor decoding"
   ],
   "neurons": 166700,
   "synapses": 25088107,
@@ -37,35 +39,39 @@
     "windRight": 4
   },
   "tracking": {
-    "left": 6.972969510889849,
-    "right": 0.7347041615658861,
+    "left": 8.112008952100522,
+    "right": 0.6483741468979067,
     "escape": 0,
-    "wing": 0.5590425147157387,
-    "sensory": 22.23710299719046,
-    "windLeft": 0.0017197747767942217,
-    "windRight": 0.47684588122699534,
-    "fired": 7990,
-    "stepMs": 4.813254344491401,
-    "simTime": 1.5,
+    "wing": 0.49335328764974257,
+    "sensory": 21.56079964154391,
+    "windLeft": 0.0015176959136640146,
+    "windRight": 0.42081501319304526,
+    "fired": 8013,
+    "stepMs": 3.9449354344250076,
+    "simTime": 1.52,
     "dt": 0.02,
-    "hearing": 0.36071813476929027,
-    "smell": 0.35529627851638873,
-    "contact": 0.3335122300547287
+    "hearing": 0.31833263663999134,
+    "smell": 0.4065369815153497,
+    "smellLeft": 0.5595902257751394,
+    "smellRight": 0.25348373725556006,
+    "contact": 0.31009573783837296
   },
   "escape": {
-    "left": 0.23389572841425485,
-    "right": 0.6280989324131858,
-    "escape": 47.07662902553277,
-    "wing": 0.7295779095245596,
-    "sensory": 0.012197817652305678,
+    "left": 0.2650385828315514,
+    "right": 0.7117293336369266,
+    "escape": 46.687386702542,
+    "wing": 0.8267200795694836,
+    "sensory": 0.013821938203501406,
     "windLeft": 0,
-    "windRight": 0.1548091918900107,
-    "fired": 6786,
-    "stepMs": 4.061034108440357,
-    "simTime": 0.64,
+    "windRight": 0.17542179631069107,
+    "fired": 6443,
+    "stepMs": 4.134505708186264,
+    "simTime": 0.62,
     "dt": 0.02,
     "hearing": 0,
     "smell": 0,
+    "smellLeft": 0,
+    "smellRight": 0,
     "contact": 0
   },
   "combined": {
@@ -77,15 +83,40 @@
     "windLeft": 0,
     "windRight": 0,
     "fired": 7053,
-    "stepMs": 3.971217449624011,
+    "stepMs": 3.8522438611550767,
     "simTime": 0.38,
     "dt": 0.02,
     "hearing": 22.67463776973341,
     "smell": 22.6746377697334,
+    "smellLeft": 0,
+    "smellRight": 45.3492755394668,
     "contact": 45.34927553946681
   },
   "measuredSpeed": {
-    "halfSpeed": 0.4995305010942276,
-    "doubleSpeed": 1.9976595475722112
+    "halfSpeed": 0.4993465951716239,
+    "doubleSpeed": 1.9995058524782021
+  },
+  "automaticEscape": {
+    "pose": {
+      "x": -1.806504223163226,
+      "z": 0.5871275837148232,
+      "heading": 4.727615791813142,
+      "escapeUntil": 0.73,
+      "escapeLatched": false,
+      "escapeCharge": 0
+    },
+    "distance": 2.1060993250520523
+  },
+  "foodSeeking": {
+    "simTime": 8.46,
+    "pose": {
+      "x": -0.9622705167761132,
+      "z": 2.6223591247534817,
+      "heading": -0.06933205181539043,
+      "escapeUntil": 0,
+      "escapeLatched": false,
+      "escapeCharge": 0
+    },
+    "distance": 0.5788717428411112
   }
 }

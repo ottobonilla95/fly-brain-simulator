@@ -222,7 +222,18 @@ export default function App() {
   if (!audioRef.current) audioRef.current = new NeuralAudio();
   const audio = audioRef.current;
   const samples = useRef<
-    { t: number; left: number; right: number; escape: number; wing: number }[]
+    {
+      t: number;
+      left: number;
+      right: number;
+      escape: number;
+      wing: number;
+      x: number;
+      z: number;
+      heading: number;
+      smellLeft: number;
+      smellRight: number;
+    }[]
   >([]);
   const world = useRef<WorldState>({
     ...INITIAL_POSE,
@@ -273,6 +284,11 @@ export default function App() {
           right: state.right,
           escape: state.escape,
           wing: state.wing,
+          x: world.current.x,
+          z: world.current.z,
+          heading: world.current.heading,
+          smellLeft: state.smellLeft,
+          smellRight: state.smellRight,
         });
         if (samples.current.length > 6000) samples.current.shift();
         if (performance.now() - lastUi.current > 100) {
@@ -1133,9 +1149,11 @@ function ModelDialog({ close }: { close: () => void }) {
         <p>
           Steering populations control turning and stereo position. Wing-motor
           activity controls a sustained tone. Rising escape activity triggers
-          low percussion and a visual climb. Pitch, timbre, constant forward
-          cruise, wall handling and the visual wing animation are designed
-          mappings, not a reconstruction of fly muscles or song.
+          low percussion, a climb and a turn-and-dash escape. An added
+          food-seeking decoder steers from left/right smell-neuron activity.
+          Pitch, timbre, constant forward cruise, wall handling and the visual
+          wing animation are designed mappings, not a reconstruction of fly
+          muscles or song.
         </p>
         <h3>A useful experiment, with clear limits</h3>
         <p>

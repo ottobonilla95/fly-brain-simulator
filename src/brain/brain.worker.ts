@@ -1,6 +1,7 @@
 import { loadConnectome } from "./upstream-loader";
 import { InstrumentBrain } from "./model";
 import { advancePose, encodeSources, INITIAL_POSE } from "../environment";
+import type { SensoryHistory } from "../environment";
 import type { SensoryInput, WorldSource } from "../types";
 const ctx = self as unknown as {
   postMessage: (data: unknown) => void;
@@ -20,6 +21,7 @@ let lastWall = 0,
   rateSim = 0,
   actualSpeed = 0;
 let pose = { ...INITIAL_POSE };
+const sensoryHistory: SensoryHistory = new Map();
 let environment: { sources: WorldSource[]; isolated: boolean } | null = null;
 let input: SensoryInput = {
   left: 0,
@@ -52,6 +54,7 @@ function loop() {
           pose,
           Math.max(0, (model.brain.steps - 25) * model.brain.p.dt),
           environment.isolated,
+          sensoryHistory,
         );
       const before = performance.now();
       state = model.step(input);
@@ -142,6 +145,7 @@ ctx.onmessage = async ({ data }) => {
       model = new InstrumentBrain(model.meta, model.weights);
       model.setNoise(noise);
       pose = { ...INITIAL_POSE };
+      sensoryHistory.clear();
       emaMs = 0;
       credit = 0;
       actualSpeed = 0;

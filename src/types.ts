@@ -14,6 +14,9 @@ export interface WorldPose {
   x: number;
   z: number;
   heading: number;
+  escapeUntil?: number;
+  escapeLatched?: boolean;
+  escapeCharge?: number;
 }
 export interface SensoryInput {
   left: number;
@@ -43,6 +46,8 @@ export interface NeuralState {
   dt: number;
   hearing: number;
   smell: number;
+  smellLeft: number;
+  smellRight: number;
   contact: number;
 }
 export const EMPTY_NEURAL: NeuralState = {
@@ -59,6 +64,8 @@ export const EMPTY_NEURAL: NeuralState = {
   dt: 0.02,
   hearing: 0,
   smell: 0,
+  smellLeft: 0,
+  smellRight: 0,
   contact: 0,
 };
 export interface WorldState {
