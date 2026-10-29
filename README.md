@@ -17,7 +17,8 @@ Open the Local URL Vite prints. Press **Start instrument** to load the bundled 5
 
 - Choose a source under **World sources**, then click inside the chamber to place it. Add several sources at once: visual targets, approaching threats, sound, food smell, wind, touch and taste.
 - Click a placed object or its list entry to select it. Drag objects or use the arrow keys to move the selected source. Right-drag to orbit; scroll to zoom.
-- Adjust each source’s strength, enable/disable it, remove it, or turn **Visible to fly** on to combine its primary sense with vision. All editor markers remain visible to you.
+- Adjust each source’s strength, enable/disable it, or turn **Visible to fly** on to combine its primary sense with vision. All editor markers remain visible to you.
+- Select an object and use **Remove object** below the world or **Remove** in its inspector. **Undo** restores the last removed object, including its position and settings. Ctrl/Cmd+Z also restores it while the chamber is focused.
 - Visible threats activate automatically as they approach or come close ahead. Escape-neuron activity triggers a turn and brief dash. A **Send looming pulse** button (also Enter) is available for manual stimulation.
 - Food smell is followed using an added decoder of left/right smell-neuron activity. This is an authored movement policy, not innate behavior supplied by the upstream repo. Touch and taste activate within 0.6 world units; sound, smell and wind fade with distance.
 - **0.5× / 1× / 2× / 5×** controls neural and world simulation speed together. The footer shows achieved speed, which may be lower than requested on slower hardware.

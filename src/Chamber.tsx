@@ -49,7 +49,7 @@ export default function Chamber({
     );
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x111c19, 0.026);
+    scene.fog = new THREE.FogExp2(0x111216, 0.026);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     camera.position.set(9.5, 8, 11.5);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -64,8 +64,8 @@ export default function Chamber({
       MIDDLE: THREE.MOUSE.DOLLY,
       RIGHT: THREE.MOUSE.ROTATE,
     };
-    scene.add(new THREE.AmbientLight(0xbed8d0, 1.8));
-    const key = new THREE.DirectionalLight(0xe3ffe1, 4);
+    scene.add(new THREE.AmbientLight(0xd5d9e3, 1.8));
+    const key = new THREE.DirectionalLight(0xf6f7fb, 4);
     key.position.set(-4, 10, 5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -76,20 +76,20 @@ export default function Chamber({
       bottom: -8,
     });
     scene.add(key);
-    const fill = new THREE.PointLight(0xafb7ff, 35, 20);
+    const fill = new THREE.PointLight(0xc4d4ff, 35, 20);
     fill.position.set(4, 4, -3);
     scene.add(fill);
-    const rim = new THREE.PointLight(0xbbef9a, 25, 15);
+    const rim = new THREE.PointLight(0xb1c9ff, 25, 15);
     rim.position.set(-4, 4, -2);
     scene.add(rim);
 
     const metal = new THREE.MeshStandardMaterial({
-      color: 0x293732,
+      color: 0x30343d,
       metalness: 0.65,
       roughness: 0.4,
     });
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x26352d,
+      color: 0x262930,
       metalness: 0.2,
       roughness: 0.9,
     });
@@ -121,7 +121,7 @@ export default function Chamber({
       new THREE.LineSegments(
         gridGeometry,
         new THREE.LineBasicMaterial({
-          color: 0x6f8b76,
+          color: 0x7c8390,
           transparent: true,
           opacity: 0.22,
         }),
@@ -143,9 +143,9 @@ export default function Chamber({
       scene.add(mesh);
       return mesh;
     }
-    ring(5.36, 0.015, 0xccebad, 0.7, 0.025);
-    ring(5.4, -0.28, 0x9dbca5, 0.2);
-    ring(5.36, 4.9, 0x9fcbb2, 0.3);
+    ring(5.36, 0.015, 0xbcc8df, 0.7, 0.025);
+    ring(5.4, -0.28, 0x8d99ad, 0.2);
+    ring(5.36, 4.9, 0x9ca9bf, 0.3);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       const geo = new THREE.BufferGeometry().setFromPoints([
@@ -156,7 +156,7 @@ export default function Chamber({
         new THREE.Line(
           geo,
           new THREE.LineBasicMaterial({
-            color: 0x95b1a0,
+            color: 0x93a0b5,
             transparent: true,
             opacity: 0.13,
           }),
@@ -168,7 +168,7 @@ export default function Chamber({
     const glass = new THREE.Mesh(
       glassGeo,
       new THREE.MeshPhysicalMaterial({
-        color: 0x9bbfa9,
+        color: 0xabb5c5,
         transparent: true,
         opacity: 0.035,
         roughness: 0.2,
@@ -183,12 +183,12 @@ export default function Chamber({
     const fly = new THREE.Group();
     scene.add(fly);
     const shell = new THREE.MeshStandardMaterial({
-      color: 0x6f7a48,
+      color: 0x84745f,
       metalness: 0.48,
       roughness: 0.5,
     });
     const dark = new THREE.MeshStandardMaterial({
-      color: 0x222d23,
+      color: 0x29262b,
       metalness: 0.4,
       roughness: 0.5,
     });
@@ -257,7 +257,7 @@ export default function Chamber({
     }
     const wings: THREE.Group[] = [];
     const wingMat = new THREE.MeshPhysicalMaterial({
-      color: 0xd4e5df,
+      color: 0xd9dfe8,
       metalness: 0.2,
       roughness: 0.15,
       transparent: true,
@@ -283,7 +283,7 @@ export default function Chamber({
           new THREE.Line(
             vein,
             new THREE.LineBasicMaterial({
-              color: 0x8ca69c,
+              color: 0x9ba4b2,
               transparent: true,
               opacity: 0.35,
             }),
@@ -295,7 +295,7 @@ export default function Chamber({
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(0.55, 0.565, 64),
       new THREE.MeshBasicMaterial({
-        color: 0xcfeeac,
+        color: 0x95b8ff,
         transparent: true,
         opacity: 0.4,
         side: THREE.DoubleSide,
@@ -329,7 +329,7 @@ export default function Chamber({
         metalness: 0.25,
       });
       const dark = new THREE.MeshStandardMaterial({
-        color: 0x202d29,
+        color: 0x272a31,
         roughness: 0.5,
       });
       const body = new THREE.Group();
@@ -464,7 +464,7 @@ export default function Chamber({
     const trail = new THREE.Line(
       trailGeo,
       new THREE.LineBasicMaterial({
-        color: 0xc5eea1,
+        color: 0x94b7ff,
         transparent: true,
         opacity: 0.25,
       }),
@@ -572,6 +572,13 @@ export default function Chamber({
       if (width && height) {
         renderer.setSize(width, height);
         camera.aspect = width / height;
+        // Keep the entire arena in view when the chamber becomes tall and narrow.
+        camera.fov = Math.max(
+          38,
+          THREE.MathUtils.radToDeg(
+            2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(24)) / camera.aspect),
+          ),
+        );
         camera.updateProjectionMatrix();
       }
     });

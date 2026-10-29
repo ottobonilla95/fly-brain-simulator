@@ -33,7 +33,7 @@ export const SOURCE_INFO: Record<
   },
   smell: {
     label: "Food smell",
-    color: "#b8dc89",
+    color: "#f5a779",
     glyph: "❋",
     description:
       "Food odour fades with distance and reaches the fly from behind. A designed food-seeking decoder turns toward the side with stronger smell-neuron activity.",

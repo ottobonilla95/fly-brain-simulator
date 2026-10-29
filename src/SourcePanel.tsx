@@ -2,6 +2,15 @@ import type { CSSProperties } from "react";
 import { Eye, Plus, SlidersHorizontal, Trash2, X, Zap } from "lucide-react";
 import { SOURCE_INFO } from "./environment";
 import type { NeuralState, SourceKind, WorldSource } from "./types";
+const sourceHints: Record<SourceKind, string> = {
+  target: "Sight · tracking",
+  loom: "Sight · escape",
+  sound: "Hearing",
+  smell: "Smell · food seeking",
+  wind: "Airflow",
+  touch: "Touch · on contact",
+  taste: "Taste · on contact",
+};
 interface Props {
   sources: WorldSource[];
   selectedId: string | null;
@@ -33,9 +42,10 @@ export default function SourcePanel({
         </h2>
         <span>{sources.length} PLACED</span>
       </div>
-      <p className="source-intro">
-        Pick a source, then click inside the world to place it.
-      </p>
+      <p className="source-intro">Add something for the fly to sense.</p>
+      <div className="source-section-label">
+        <span>01</span> CHOOSE & PLACE
+      </div>
       <div
         className="source-palette"
         role="group"
@@ -50,10 +60,13 @@ export default function SourcePanel({
               aria-pressed={placing === kind}
               className={placing === kind ? "armed" : ""}
               onClick={() => onChoose(placing === kind ? null : kind)}
+              title={info.description}
               style={{ "--source-color": info.color } as CSSProperties}
             >
               <span aria-hidden="true">{info.glyph}</span>
-              {info.label}
+              <span className="source-palette-copy">
+                {info.label}<small>{sourceHints[kind]}</small>
+              </span>
               <Plus size={12} />
             </button>
           );
@@ -67,6 +80,9 @@ export default function SourcePanel({
           </button>
         </div>
       )}
+      <div className="source-section-label placed-heading">
+        <span>02</span> IN YOUR WORLD <small>{sources.length}</small>
+      </div>
       <div className="placed-sources" role="group" aria-label="Placed sources">
         {sources.map((s, i) => (
           <button
@@ -101,11 +117,12 @@ export default function SourcePanel({
           <div className="source-inspector-heading">
             <strong>{SOURCE_INFO[selected.kind].label}</strong>
             <button
+              className="remove-source-button"
               onClick={() => onRemove(selected.id)}
               aria-label="Remove selected source"
               title="Remove selected source"
             >
-              <Trash2 size={14} />
+              <Trash2 size={14} /> Remove
             </button>
           </div>
           <p>{SOURCE_INFO[selected.kind].description}</p>
@@ -159,6 +176,11 @@ export default function SourcePanel({
             stimulation.
           </p>
         </div>
+      )}
+      {!selected && sources.length > 0 && (
+        <p className="source-selection-hint">
+          Select an object above or in the world to adjust or remove it.
+        </p>
       )}
       <div
         className="sense-readouts"

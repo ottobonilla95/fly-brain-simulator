@@ -28,6 +28,8 @@ import {
   Radio,
   RotateCcw,
   Sparkles,
+  Trash2,
+  Undo2,
   Volume2,
   VolumeX,
   Waves,
@@ -41,7 +43,7 @@ import SourcePanel from "./SourcePanel";
 import type { NeuralState, SourceKind, WorldSource, WorldState } from "./types";
 const Chamber = lazy(() => import("./Chamber"));
 
-const palette = ["#d0edaa", "#bfb5e4", "#e5aa83"];
+const palette = ["#99b8ff", "#bfb5e4", "#e5aa83"];
 const brainDots = Array.from({ length: 136 }, (_, i) => {
   const a = i * 2.39996,
     r = Math.sqrt(((i * 47) % 137) / 137);
@@ -134,7 +136,7 @@ function Scope({ audio, running }: { audio: NeuralAudio; running: boolean }) {
       ctx.lineTo(w, h / 2);
       ctx.stroke();
       audio.waveform(samples);
-      ctx.strokeStyle = running && audio.enabled ? "#d0edaa" : "#57705e";
+      ctx.strokeStyle = running && audio.enabled ? "#99b8ff" : "#64718b";
       ctx.lineWidth = 1.5 * window.devicePixelRatio;
       ctx.beginPath();
       for (let i = 0; i < samples.length; i += 4) {
@@ -171,7 +173,7 @@ function BrainMap({ n }: { n: NeuralState }) {
       <path
         d="M89 22C62-5 13 24 24 65C26 91 55 105 83 88M95 22C122-5 171 24 160 65C158 91 129 105 101 88M88 75L87 109M96 75L97 109"
         fill="none"
-        stroke="#6b8574"
+        stroke="#7b879e"
         strokeOpacity=".22"
       />
       {brainDots.map((d, i) => (
@@ -184,7 +186,7 @@ function BrainMap({ n }: { n: NeuralState }) {
           opacity={0.18 + Math.min(1, rates[d.group] / 20) * 0.8}
         />
       ))}
-      <path d="M92 19V102" stroke="#50634f" strokeDasharray="2 5" />
+      <path d="M92 19V102" stroke="#55647c" strokeDasharray="2 5" />
     </svg>
   );
 }
@@ -199,6 +201,10 @@ export default function App() {
   const [sources, setSources] = useState(initialSources);
   const [selectedId, setSelectedId] = useState<string | null>("target-1");
   const [placing, setPlacing] = useState<SourceKind | null>(null);
+  const [removedSource, setRemovedSource] = useState<{
+    source: WorldSource;
+    index: number;
+  } | null>(null);
   const [speed, setSpeed] = useState(1);
   const [actualSpeed, setActualSpeed] = useState(0);
   const [volume, setVolume] = useState(0.5),
@@ -403,10 +409,25 @@ export default function App() {
     [editSource],
   );
   const removeSource = useCallback((id: string) => {
+    const index = world.current.sources.findIndex((source) => source.id === id);
+    if (index < 0) return;
+    setRemovedSource({ source: world.current.sources[index], index });
+    setNotice("");
     setSources((prev) => prev.filter((source) => source.id !== id));
     world.current.selectedId = null;
     setSelectedId(null);
   }, []);
+  const undoRemove = useCallback(() => {
+    if (!removedSource) return;
+    const restored = { ...removedSource.source, pulseAt: -1 };
+    setSources((prev) => [
+      ...prev.slice(0, removedSource.index),
+      restored,
+      ...prev.slice(removedSource.index),
+    ]);
+    selectSource(restored.id);
+    setRemovedSource(null);
+  }, [removedSource, selectSource]);
   const onSceneError = useCallback(
     (message: string) => setSceneError(message),
     [],
@@ -443,18 +464,31 @@ export default function App() {
   }, [editSource]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (dialog) setDialog(false);
+        else chooseSource(null);
+        return;
+      }
       if (
         (e.target as HTMLElement).matches("input,button,a,select,textarea") ||
         dialog
       ) {
-        if (e.key === "Escape") setDialog(false);
         return;
       }
       if (e.code === "Space") {
         e.preventDefault();
         toggleRun();
       }
-      if (e.key === "Escape") chooseSource(null);
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "z" &&
+        removedSource
+      ) {
+        e.preventDefault();
+        undoRemove();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === "t") chooseSource("target");
       if (e.key.toLowerCase() === "l") chooseSource("loom");
       if (e.key.toLowerCase() === "w") chooseSource("wind");
@@ -479,7 +513,10 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleRun, chooseSource, moveSource, removeSource, pulse, dialog]);
+  }, [
+    toggleRun, chooseSource, moveSource, removeSource, pulse, dialog,
+    removedSource, undoRemove,
+  ]);
   const toggleSound = async () => {
     if (!sound) {
       try {
@@ -571,6 +608,7 @@ export default function App() {
           : phase === "ready"
             ? "Paused"
             : "Ready to initialize";
+  const selectedSource = sources.find((source) => source.id === selectedId);
   return (
     <>
       <header className="topbar">
@@ -646,6 +684,7 @@ export default function App() {
                   className={grid ? "selected" : ""}
                 >
                   <Grid2X2 size={15} />
+                  <span>Grid</span>
                 </button>
                 <button
                   title="Toggle overhead view"
@@ -658,6 +697,7 @@ export default function App() {
                   }}
                 >
                   <Orbit size={16} />
+                  <span>Top view</span>
                 </button>
                 <button
                   title="Fullscreen chamber"
@@ -748,10 +788,50 @@ export default function App() {
                 </div>
               )}
             </div>
+            <div className={`world-edit-bar ${placing ? "is-placing" : ""}`}>
+              {placing ? (
+                <>
+                  <span className="world-edit-copy">
+                    <MousePointer2 size={15} />
+                    <span>Click the world to place <strong>{SOURCE_INFO[placing].label.toLowerCase()}</strong></span>
+                  </span>
+                  <button onClick={() => chooseSource(null)} aria-label="Cancel world placement">
+                    <X size={14} /> Cancel
+                  </button>
+                </>
+              ) : selectedSource ? (
+                <>
+                  <span className="world-edit-copy">
+                    <span
+                      className="selected-source-glyph"
+                      style={{ color: SOURCE_INFO[selectedSource.kind].color }}
+                      aria-hidden="true"
+                    >
+                      {SOURCE_INFO[selectedSource.kind].glyph}
+                    </span>
+                    <span>
+                      <small>SELECTED OBJECT</small>
+                      <strong>{SOURCE_INFO[selectedSource.kind].label}</strong>
+                    </span>
+                  </span>
+                  <button
+                    className="world-remove-button"
+                    onClick={() => removeSource(selectedSource.id)}
+                    aria-label="Remove object from world"
+                  >
+                    <Trash2 size={14} /> Remove object
+                  </button>
+                </>
+              ) : (
+                <span className="world-edit-copy">
+                  <MousePointer2 size={15} />
+                  Select an object to edit it, or add one from World sources.
+                </span>
+              )}
+            </div>
             <div className="scene-bottom">
               <span>
-                <MousePointer2 size={13} /> Pick a source · click to place ·
-                drag to move <span className="shortcut">↑ ↓ ← →</span>
+                Drag objects to move <span className="shortcut">· ↑ ↓ ← →</span>
               </span>
               <button
                 className={trails ? "trail-on" : ""}
@@ -804,6 +884,7 @@ export default function App() {
                   role="group"
                   aria-label="Simulation speed"
                 >
+                  <span className="speed-label">Speed</span>
                   {[0.5, 1, 2, 5].map((value) => (
                     <button
                       key={value}
@@ -1066,7 +1147,21 @@ export default function App() {
           </div>
         </footer>
       </main>
-      {notice && (
+      {removedSource ? (
+        <div className="toast removal-toast" role="status">
+          <Trash2 size={15} />
+          <span>{SOURCE_INFO[removedSource.source.kind].label} removed.</span>
+          <button className="undo-button" onClick={undoRemove}>
+            <Undo2 size={14} /> Undo
+          </button>
+          <button
+            aria-label="Dismiss removal notification"
+            onClick={() => setRemovedSource(null)}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ) : notice && (
         <div className="toast" role="status">
           <Check size={15} />
           {notice}
